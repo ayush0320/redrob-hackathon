@@ -21,8 +21,6 @@ python verify_solution.py
 
 ---
 
-## 🚀 Quick Start (5 minutes)
-
 1. **Verify the solution works:**
 
    ```bash
