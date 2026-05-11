@@ -1,11 +1,10 @@
-import math
-from collections import defaultdict
 
-# ============================================================================
-# SKILL_ALIASES - Exact mapping from problem statement
-# ============================================================================
+import re
+import math
+from collections import Counter
+
+# Define the SKILL_ALIASES dictionary
 SKILL_ALIASES = {
-    # Languages
     "python": "python",
     "pyhton": "python",
     "java": "java",
@@ -18,7 +17,6 @@ SKILL_ALIASES = {
     "cpp": "cpp",
     "r": "r",
     "kotlin": "kotlin",
-    # ML / Data
     "machinelearning": "machine_learning",
     "machine learning": "machine_learning",
     "ml": "machine_learning",
@@ -47,7 +45,6 @@ SKILL_ALIASES = {
     "powerbi": "data_visualization",
     "pandas": "pandas",
     "numpy": "numpy",
-    # Web — Frontend
     "react": "react",
     "reacts": "react",
     "reactjs": "react",
@@ -62,7 +59,6 @@ SKILL_ALIASES = {
     "css": "html_css",
     "jest": "jest",
     "graphql": "graphql",
-    # Web — Backend
     "node.js": "nodejs",
     "nodejs": "nodejs",
     "node js": "nodejs",
@@ -73,7 +69,6 @@ SKILL_ALIASES = {
     "rest": "rest_api",
     "restapi": "rest_api",
     "microservices": "microservices",
-    # Databases
     "sql": "sql",
     "mysql": "mysql",
     "mysq": "mysql",
@@ -81,7 +76,6 @@ SKILL_ALIASES = {
     "postgres": "postgresql",
     "mongodb": "mongodb",
     "redis": "redis",
-    # DevOps / Cloud
     "docker": "docker",
     "kubernetes": "kubernetes",
     "kubernates": "kubernetes",
@@ -90,334 +84,120 @@ SKILL_ALIASES = {
     "cicd": "ci_cd",
     "ci cd": "ci_cd",
     "aws": "aws",
-    # Mobile
-    "android": "android",
-    "firebase": "firebase",
-    # CS Fundamentals
-    "algorithms": "algorithms",
-    "algoritms": "algorithms",
-    "data structure": "data_structures",
-    "data structures": "data_structures",
-    "competitive programming": "competitive_programming",
-    # Design
-    "ui/ux": "ui_ux",
-    "ui ux": "ui_ux",
-    "figma": "figma",
 }
 
-# ============================================================================
-# RESUME DATA
-# ============================================================================
-RESUMES = [
-    {"id": "01", "name": "Arjun Sharma", "skills": "Pyhton, MachineLearning, SQL, pandas, numpy, Deep-learning"},
-    {"id": "02", "name": "Priya Nair", "skills": "JavaScrpit, Reacts, Node.JS, MongoDb, REST api, HTML/CSS"},
-    {"id": "03", "name": "Rahul Gupta", "skills": "Java, Spring Boot, MySql, Microservices, Docker, kubernates"},
-    {"id": "04", "name": "Sneha Patel", "skills": "Python, TensorFlow, Keras, NLP, BERT, data-viz, matplotlib"},
-    {"id": "05", "name": "Vikram Singh", "skills": "C++, Algoritms, Data Structure, competitive programming, python"},
-    {"id": "06", "name": "Ananya Krishnan", "skills": "javascript, vue.js, python, flask, PostgreSQL, AWS, CI/CD"},
-    {"id": "07", "name": "Karan Mehta", "skills": "Python, Sklearn, XGboost, feature engineering, SQL, tableau"},
-    {"id": "08", "name": "Deepika Rao", "skills": "Java, Android, Kotlin, Firebase, REST, UI/UX, figma"},
-    {"id": "09", "name": "Aditya Kumar", "skills": "Reactjs, TypeScrpit, GraphQL, redux, tailwind, nodejs, jest"},
-    {"id": "10", "name": "Meera Iyer", "skills": "python, R, statistics, ML, regression, clustering, Power-BI"},
-]
-
-JOB_DESCRIPTIONS = [
-    {
-        "id": "JD-1",
-        "company": "Kakao (Seoul)",
-        "role": "ML Engineer",
-        "skills": "Python, Machine Learning, Deep Learning, TensorFlow, PyTorch, SQL, Data Visualization, NLP, BERT, Feature Engineering, Statistics"
-    },
-    {
-        "id": "JD-2",
-        "company": "Naver (Seongnam)",
-        "role": "Backend Engineer",
-        "skills": "Java, Spring Boot, MySQL, PostgreSQL, Microservices, Docker, Kubernetes, REST API, CI/CD, Redis"
-    },
-    {
-        "id": "JD-3",
-        "company": "Line (Seoul)",
-        "role": "Frontend Engineer",
-        "skills": "JavaScript, React, Vue, TypeScript, REST API, HTML/CSS, Node.js, GraphQL, Redux, Jest, AWS"
-    },
-]
-
-# ============================================================================
-# STEP 1: NORMALIZE SKILLS
-# ============================================================================
-def normalize_skills(raw_skills_str):
+def normalize_skills(raw_skills):
     """
-    Normalize a comma-separated skill string:
-    1. Split by comma
-    2. Lowercase each token
-    3. Match multi-word phrases first, then single tokens
-    4. Apply alias mapping
-    5. Discard unknown tokens
+    Normalize the raw skills string by splitting on commas, lowercasing tokens,
+    applying alias mapping, and discarding unknown tokens.
     """
-    raw_tokens = [token.strip() for token in raw_skills_str.split(",")]
-    normalized = []
-    
-    for token in raw_tokens:
-        token_lower = token.lower()
-        
-        # Try exact match in SKILL_ALIASES
-        if token_lower in SKILL_ALIASES:
-            normalized.append(SKILL_ALIASES[token_lower])
-        # Try matching as part of a multi-word phrase
-        else:
-            matched = False
-            # Check if this token is part of any multi-word alias key
-            for alias_key in SKILL_ALIASES:
-                if " " in alias_key and token_lower == alias_key.lower():
-                    normalized.append(SKILL_ALIASES[alias_key])
-                    matched = True
-                    break
-            
-            # If no match, discard (unknown token)
-            if not matched:
-                pass  # Discard unknown tokens
-    
-    return normalized
+    skills = []
+    for token in raw_skills.split(','):
+        token = token.strip().lower()
+        if token in SKILL_ALIASES:
+            skills.append(SKILL_ALIASES[token])
+    return skills
 
-# ============================================================================
-# STEP 2: DEDUPLICATE SKILLS
-# ============================================================================
-def deduplicate_skills(normalized_skills):
-    """Remove duplicate canonical skills from list"""
-    return list(dict.fromkeys(normalized_skills))  # Preserves order, removes duplicates
-
-# ============================================================================
-# STEP 3: BUILD VOCABULARY
-# ============================================================================
-def build_vocabulary(all_resumes):
-    """Create sorted vocabulary from all normalized & deduplicated resume skills"""
-    vocab_set = set()
-    
-    for resume in all_resumes:
-        normalized = normalize_skills(resume["skills"])
-        deduplicated = deduplicate_skills(normalized)
-        vocab_set.update(deduplicated)
-    
-    # Sort alphabetically
-    vocabulary = sorted(list(vocab_set))
-    return vocabulary
-
-# ============================================================================
-# STEP 4: COMPUTE TF-IDF VECTORS
-# ============================================================================
-def compute_tfidf_vectors(all_resumes, vocabulary):
+def deduplicate_skills(skills):
     """
-    Compute TF-IDF vectors for all resumes.
-    TF = 1/N (where N = unique skills in resume)
-    IDF = ln(10 / df) where df = number of resumes containing skill
+    Remove duplicate canonical skills from the list.
     """
-    # First, get normalized & deduplicated skills for each resume
-    normalized_resumes = []
-    for resume in all_resumes:
-        normalized = normalize_skills(resume["skills"])
-        deduplicated = deduplicate_skills(normalized)
-        normalized_resumes.append(deduplicated)
-    
-    # Compute document frequency for each skill
-    df = defaultdict(int)
-    for skills in normalized_resumes:
-        for skill in set(skills):  # Use set to count unique skills per resume
-            df[skill] += 1
-    
-    # Compute IDF for each skill
-    idf = {}
-    for skill in vocabulary:
-        if df[skill] > 0:
-            idf[skill] = math.log(10 / df[skill])
-        else:
-            idf[skill] = 0
-    
-    # Compute TF-IDF vectors
-    tfidf_vectors = []
-    for i, skills in enumerate(normalized_resumes):
-        N = len(skills)
-        vector = []
-        
+    return list(set(skills))
+
+def build_vocabulary(resumes):
+    """
+    Create a shared vocabulary from all normalized + deduplicated resume skills.
+    """
+    vocabulary = set()
+    for resume in resumes:
+        skills = normalize_skills(resume['raw_skills'])
+        skills = deduplicate_skills(skills)
+        vocabulary.update(skills)
+    return sorted(list(vocabulary))
+
+def compute_tf_idf(resumes, vocabulary):
+    """
+    Compute TF-IDF vectors for resumes using the exact formulas.
+    """
+    tf_idf_vectors = []
+    for resume in resumes:
+        skills = normalize_skills(resume['raw_skills'])
+        skills = deduplicate_skills(skills)
+        tf = Counter(skills)
+        idf = {}
         for skill in vocabulary:
-            if N > 0 and skill in skills:
-                tf = 1 / N
-                tfidf = tf * idf[skill]
-            else:
-                tfidf = 0
-            vector.append(tfidf)
-        
-        tfidf_vectors.append(vector)
-    
-    return tfidf_vectors, idf, normalized_resumes
+            idf[skill] = math.log(10 / sum(1 for r in resumes if skill in normalize_skills(r['raw_skills'])))
+        tf_idf = {skill: tf[skill] * idf[skill] for skill in vocabulary}
+        tf_idf_vectors.append(tf_idf)
+    return tf_idf_vectors
 
-# ============================================================================
-# STEP 5: BUILD JD BINARY VECTORS
-# ============================================================================
 def build_jd_vectors(job_descriptions, vocabulary):
     """
-    Build binary vectors for JDs.
-    For each skill in vocabulary, put 1 if present in JD, 0 otherwise.
+    Create binary vectors for job descriptions over the same vocabulary.
     """
     jd_vectors = []
-    
     for jd in job_descriptions:
-        # Combine required and preferred skills
-        all_jd_skills = jd["skills"]
-        
-        # Parse skills from JD (they're comma-separated or space-separated in the description)
-        # We need to normalize them the same way as resume skills
-        jd_skill_tokens = [s.strip().lower() for s in all_jd_skills.replace(",", " ").split()]
-        
-        # Normalize JD skills
-        jd_normalized = []
-        for token in jd_skill_tokens:
-            if token in SKILL_ALIASES:
-                jd_normalized.append(SKILL_ALIASES[token])
-            else:
-                # Try to match multi-word phrases
-                matched = False
-                for alias_key in SKILL_ALIASES:
-                    if " " in alias_key and token in alias_key.lower().split():
-                        # This is a partial match; we need full phrase matching
-                        pass
-                if not matched:
-                    pass  # Discard unknown
-        
-        # Better approach: parse JD skills more carefully
-        # Split by comma first to get individual skills
-        jd_skills_raw = [s.strip() for s in all_jd_skills.split(",")]
-        jd_normalized = []
-        
-        for skill_raw in jd_skills_raw:
-            skill_lower = skill_raw.lower()
-            if skill_lower in SKILL_ALIASES:
-                jd_normalized.append(SKILL_ALIASES[skill_lower])
-            else:
-                # Check multi-word matches
-                matched = False
-                for alias_key in SKILL_ALIASES:
-                    if " " in alias_key and skill_lower == alias_key.lower():
-                        jd_normalized.append(SKILL_ALIASES[alias_key])
-                        matched = True
-                        break
-        
-        # Deduplicate
-        jd_dedup = deduplicate_skills(jd_normalized)
-        
-        # Build binary vector
-        vector = [1 if skill in jd_dedup else 0 for skill in vocabulary]
-        jd_vectors.append(vector)
-    
+        skills = jd['required_skills'] + jd['preferred_skills']
+        skills = [skill.lower() for skill in skills]
+        jd_vector = {skill: 1 if skill in skills else 0 for skill in vocabulary}
+        jd_vectors.append(jd_vector)
     return jd_vectors
 
-# ============================================================================
-# STEP 6: COSINE SIMILARITY & RANKING
-# ============================================================================
-def cosine_similarity(vec_a, vec_b):
+def compute_cosine_similarity(tf_idf_vectors, jd_vectors):
     """
-    Cosine(A, B) = (A · B) / (|A| × |B|)
+    Compute cosine similarity between resumes and JDs.
     """
-    # Dot product
-    dot_product = sum(a * b for a, b in zip(vec_a, vec_b))
-    
-    # Magnitude of A
-    magnitude_a = math.sqrt(sum(a * a for a in vec_a))
-    
-    # Magnitude of B
-    magnitude_b = math.sqrt(sum(b * b for b in vec_b))
-    
-    if magnitude_a == 0 or magnitude_b == 0:
-        return 0
-    
-    return dot_product / (magnitude_a * magnitude_b)
+    similarities = []
+    for tf_idf_vector in tf_idf_vectors:
+        for jd_vector in jd_vectors:
+            dot_product = sum(tf_idf_vector[skill] * jd_vector[skill] for skill in tf_idf_vector)
+            magnitude_tf_idf = math.sqrt(sum(tf_idf_vector[skill] ** 2 for skill in tf_idf_vector))
+            magnitude_jd = math.sqrt(sum(jd_vector[skill] ** 2 for skill in jd_vector))
+            similarity = dot_product / (magnitude_tf_idf * magnitude_jd)
+            similarities.append(similarity)
+    return similarities
 
-def rank_candidates(tfidf_vectors, jd_vector, candidate_names):
+def rank_candidates(similarities, resumes, job_descriptions):
     """
-    Rank candidates by cosine similarity to JD.
-    Returns top 3 with scores rounded to 2 decimal places.
-    Ties broken alphabetically by candidate name.
+    Rank the Top 3 candidates per JD based on cosine similarity.
     """
-    scores = []
-    for i, resume_vec in enumerate(tfidf_vectors):
-        score = cosine_similarity(resume_vec, jd_vector)
-        scores.append((candidate_names[i], score))
-    
-    # Sort by score (descending), then by name (ascending) for tiebreaking
-    scores.sort(key=lambda x: (-x[1], x[0]))
-    
-    # Return top 3 with scores rounded to 2 decimal places
-    top_3 = [(name, round(score, 2)) for name, score in scores[:3]]
-    return top_3
+    ranked_candidates = []
+    for i, jd in enumerate(job_descriptions):
+        jd_similarities = similarities[i::len(job_descriptions)]
+        top_3_indices = sorted(range(len(jd_similarities)), key=lambda i: jd_similarities[i], reverse=True)[:3]
+        top_3_candidates = [resumes[j] for j in top_3_indices]
+        ranked_candidates.append(top_3_candidates)
+    return ranked_candidates
 
-# ============================================================================
-# MAIN EXECUTION
-# ============================================================================
-def main():
-    print("=" * 80)
-    print("RESUME MATCHING ENGINE - REDROB HACKATHON")
-    print("=" * 80)
-    
-    # Get candidate names
-    candidate_names = [resume["name"] for resume in RESUMES]
-    
-    # Step 1-2: Normalize and deduplicate
-    print("\n[STEP 1-2] Normalizing and deduplicating skills...")
-    normalized_all = []
-    for resume in RESUMES:
-        normalized = normalize_skills(resume["skills"])
-        deduplicated = deduplicate_skills(normalized)
-        normalized_all.append(deduplicated)
-        print(f"  {resume['name']}: {deduplicated}")
-    
-    # Step 3: Build vocabulary
-    print("\n[STEP 3] Building vocabulary...")
-    vocabulary = build_vocabulary(RESUMES)
-    print(f"  Vocabulary size: {len(vocabulary)}")
-    print(f"  Vocabulary: {vocabulary}")
-    
-    # Step 4: Compute TF-IDF vectors
-    print("\n[STEP 4] Computing TF-IDF vectors...")
-    tfidf_vectors, idf, normalized_resumes = compute_tfidf_vectors(RESUMES, vocabulary)
-    
-    # Step 5: Build JD vectors
-    print("\n[STEP 5] Building JD binary vectors...")
-    jd_vectors = build_jd_vectors(JOB_DESCRIPTIONS, vocabulary)
-    
-    # Step 6: Compute similarity and rank
-    print("\n[STEP 6] Computing cosine similarity and ranking...")
-    
-    results = {}
-    for jd_idx, (jd, jd_vector) in enumerate(zip(JOB_DESCRIPTIONS, jd_vectors)):
-        jd_id = jd["id"]
-        company = jd["company"]
-        role = jd["role"]
-        
-        top_3 = rank_candidates(tfidf_vectors, jd_vector, candidate_names)
-        results[jd_id] = top_3
-        
-        print(f"\n{jd_id} — {company} ({role})")
-        for rank, (name, score) in enumerate(top_3, 1):
-            print(f"  {rank}. {name}({score})")
-    
-    # ========================================================================
-    # FINAL OUTPUT
-    # ========================================================================
-    print("\n" + "=" * 80)
-    print("FINAL RESULTS")
-    print("=" * 80)
-    
-    for jd_idx, jd in enumerate(JOB_DESCRIPTIONS):
-        jd_id = jd["id"]
-        company = jd["company"]
-        role = jd["role"]
-        top_3 = results[jd_id]
-        
-        # Format: Name(score), Name(score), Name(score)
-        output = ", ".join([f"{name}({score})" for name, score in top_3])
-        print(f"\n{jd_id} — {company} ({role})")
-        print(output)
-    
-    return results
+# Load the resume and job description data
+resumes = [
+    {"name": "Arjun Sharma", "raw_skills": "Pyhton, MachineLearning, SQL, pandas, numpy, Deep-learning"},
+    {"name": "Priya Nair", "raw_skills": "JavaScrpit, Reacts, Node.JS, MongoDb, REST api, HTML/CSS"},
+    {"name": "Rahul Gupta", "raw_skills": "Java, Spring Boot, MySql, Microservices, Docker, kubernates"},
+    {"name": "Sneha Patel", "raw_skills": "Python, TensorFlow, Keras, NLP, BERT, data-viz, matplotlib"},
+    {"name": "Vikram Singh", "raw_skills": "C++, Algoritms, Data Structure, competitive programming, python"},
+    {"name": "Ananya Krishnan", "raw_skills": "javascript, vue.js, python, flask, PostgreSQL, AWS, CI/CD"},
+    {"name": "Karan Mehta", "raw_skills": "Python, Sklearn, XGboost, feature engineering, SQL, tableau"},
+    {"name": "Deepika Rao", "raw_skills": "Java, Android, Kotlin, Firebase, REST, UI/UX, figma"},
+    {"name": "Aditya Kumar", "raw_skills": "Reactjs, TypeScrpit, GraphQL, redux, tailwind, nodejs, jest"},
+    {"name": "Meera Iyer", "raw_skills": "python, R, statistics, ML, regression, clustering, Power-BI"},
+]
 
-if __name__ == "__main__":
-    main()
+job_descriptions = [
+    {"company": "Kakao", "role": "ML Engineer", "required_skills": ["Python", "Machine Learning", "Deep Learning"], "preferred_skills": ["NLP", "BERT"]},
+    {"company": "Naver", "role": "Backend Engineer", "required_skills": ["Java", "Spring Boot"], "preferred_skills": ["REST API", "CI/CD"]},
+    {"company": "Line", "role": "Frontend Engineer", "required_skills": ["JavaScript", "React"], "preferred_skills": ["Node.js", "GraphQL"]},
+]
+
+# Compute the TF-IDF vectors for resumes
+vocabulary = build_vocabulary(resumes)
+tf_idf_vectors = compute_tf_idf(resumes, vocabulary)
+
+# Compute the binary vectors for job descriptions
+jd_vectors = build_jd_vectors(job_descriptions, vocabulary)
+
+# Compute the cosine similarity between resumes and JDs
+similarities = compute_cosine_similarity(tf_idf_vectors, jd_vectors)
+
+# Rank the Top 3 candidates per JD
+ranked_candidates = rank_candidates(similarities, resumes, job_descriptions)
